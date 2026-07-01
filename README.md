@@ -46,6 +46,31 @@ Resolves via [`kotoba-lang/occupation`](https://github.com/kotoba-lang/occupatio
 See [`docs/business-model.md`](docs/business-model.md) and
 [`docs/operator-guide.md`](docs/operator-guide.md).
 
+## Reference implementation
+
+`src/home_care/{store,governor}.cljc` is a minimal but real implementation
+of the Core Contract above (pure cljc, no external deps):
+
+- `home-care.store` — `Store` protocol + `MemStore`: clients, care plans,
+  visits, lift events. A visit/lift event can only be recorded against a
+  registered client with a registered care plan (care-plan provenance).
+- `home-care.governor` — `HomeCareGovernor`: `assess` gates a proposal
+  against the care-plan env. Hard invariants force `:hold` (no care plan,
+  direct-write instead of `:propose`); lifting/transfer-assist proposals
+  **always** escalate to `:human-approval` regardless of safety-class or
+  confidence — a lift/transfer robot never operates unsupervised;
+  `:high`/`:safety-critical` and low-confidence proposals also escalate.
+
+```bash
+clojure -M:test   # 7 tests, 13 assertions, green
+```
+
+This is what backs this repo's `:maturity :implemented` entry in
+[`kotoba-lang/occupation`](https://github.com/kotoba-lang/occupation) —
+the 6th `cloud-itonami-isco-*` occupation to reach that tier, after
+`cloud-itonami-isco-6112`, `-2221`, `-7126`, `-4321` and `-9312`
+(ADR-2607012000).
+
 ## License
 
 AGPL-3.0-or-later.
