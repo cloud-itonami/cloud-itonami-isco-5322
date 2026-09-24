@@ -1,0 +1,35 @@
+;; What this vertical's robot physically does, declared for
+;; kotoba.robotics.process (kotoba-lang/robotics). `kbb -M:physics` runs it.
+;;
+;; README "Robotics premise": a mobility and lifting-assist robot supports
+;; daily-living tasks during home visits; lifting/transfer assist is
+;; :safety-critical and needs human sign-off. Declared here: the hoist arm
+;; of a transfer assist raising the client from the bed edge towards the
+;; wheelchair (modelled as a two-link boom carrying the client's mass at
+;; its tip), and the powered wheelchair-push assist from bedroom to living
+;; room.
+;;
+;; Every number without a cited source is marked `estimate` in its :basis.
+;; Replacing an estimate with a sourced value is this bot's growth work.
+{:physics/schema "itonami.physical-ai.spec.v1"
+ :repo "cloud-itonami/cloud-itonami-isco-5322"
+ :cases
+ [{:id :transfer-hoist-lift
+   :kind :manipulator
+   :procedure "hoist boom raises the client in a sling from the bed edge towards the wheelchair (transfer assist, carer present and signed off)"
+   :params {:l1-m 0.80 :l2-m 0.60 :m1-kg 12.0 :m2-kg 8.0
+            :from [0.70 0.20] :to [0.60 0.60] :duration-s 6.0 :steps 600}
+   :sweep {:param :payload-kg :values [40.0 55.0 70.0 90.0 110.0]}
+   :quantity :peak-tau1-nm
+   :limit {:max 1000.0 :basis "estimate: rated boom-joint torque of a home patient-hoist actuator"}
+   :boundary {:lo 20.0 :hi 200.0}}
+  {:id :wheelchair-push-assist
+   :kind :transport
+   :procedure "push-assist robot moves the client in the wheelchair from the bedroom to the living room"
+   :params {:mass-kg 30.0 :distance-m 12.0 :v-max-mps 0.6 :a-max-mps2 0.3
+            :brake-decel-mps2 0.4 :drive-force-n 90.0 :crr 0.03
+            :cog-height-m 0.65 :support-half-length-m 0.35}
+   :sweep {:param :payload-kg :values [55.0 70.0 90.0 110.0 140.0]}
+   :quantity :cycle-time-s
+   :limit {:max 25.0 :basis "estimate: a room-to-room move short enough not to tire or chill the client; client+wheelchair mass range is also an estimate"}
+   :boundary {:lo 30.0 :hi 400.0}}]}
