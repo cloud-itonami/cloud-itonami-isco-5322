@@ -1,5 +1,6 @@
 (ns home-care.governor-test
   (:require [kotoba.test :refer [deftest is testing]]
+            [home-care.facts :as facts]
             [home-care.store :as store]
             [home-care.governor :as governor]))
 
@@ -80,3 +81,52 @@
           "欠落した :confidence は 0.0 であって 1.0 ではない")
       (is (not= :proceed (:decision result))
           "確信度不明の提案が自動で通ってはならない"))))
+
+;; -- MHLW 腰痛予防対策指針 別紙 Ⅳ 3 (3) イ (home-care.facts) ------------------
+
+(defn- store-with-mobility [mobility]
+  (let [st (store/mem-store)]
+    (store/register-client! st {:client-id "c-full" :consented-at "2026-01-01"})
+    (store/register-care-plan! st {:client-id "c-full" :protocol "daily-living-support"
+                                   :mobility mobility})
+    st))
+
+(defn- lift [method]
+  (cond-> {:action :lift :client-id "c-full" :safety-class :high
+           :effect :propose :confidence 0.95}
+    method (assoc :method method)))
+
+(deftest holds-a-manual-lift-of-a-full-assist-client
+  (testing "全介助の対象者を人力で抱上げる提案は、確信度が高くても :hold"
+    (let [env (governor/env-for-store (store-with-mobility :full-assist))
+          result (governor/assess env (lift :manual))
+          v (first (filter #(= :manual-lift-of-full-assist (:rule %)) (:violations result)))]
+      (is (= :hold (:decision result)))
+      (is (some? v))
+      (is (= facts/guideline-url (:source-url v))))))
+
+(deftest holds-a-full-assist-lift-that-names-no-aid
+  (testing "method を言わない提案は、リフト等を使うと言っていないので :hold"
+    (let [env (governor/env-for-store (store-with-mobility :full-assist))
+          result (governor/assess env (lift nil))]
+      (is (= :hold (:decision result)))
+      (is (= [:manual-lift-of-full-assist] (mapv :rule (:violations result)))))))
+
+(deftest a-robot-lift-of-a-full-assist-client-still-needs-a-human
+  (let [env (governor/env-for-store (store-with-mobility :full-assist))
+        result (governor/assess env (lift :robot))]
+    (is (= :human-approval (:decision result)))
+    (is (= :lifting-transfer-assist (:reason result)))
+    (is (= :lift (:recommended-aid result)))))
+
+(deftest a-manual-transfer-of-a-sitting-client-is-advice-not-a-hold
+  (testing "座位保持できる対象者への助言（スライディングボード）は『検討』であって禁止ではない"
+    (let [env (governor/env-for-store (store-with-mobility :sitting))
+          result (governor/assess env (lift :manual))]
+      (is (= :human-approval (:decision result)))
+      (is (= :sliding-board (:recommended-aid result))))))
+
+(deftest every-enforced-fact-carries-its-primary-source
+  (doseq [f [facts/scope facts/no-manual-lift-of-full-assist facts/aid-by-mobility]]
+    (is (= facts/guideline-url (:source-url f)))
+    (is (seq (:source-quote f)))))
