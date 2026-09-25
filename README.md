@@ -48,8 +48,8 @@ See [`docs/business-model.md`](docs/business-model.md) and
 
 ## Reference implementation
 
-`src/home_care/{store,governor}.cljc` is a minimal but real implementation
-of the Core Contract above (pure cljc, no external deps):
+`src/home_care/{store,governor,facts}.cljk` is a minimal but real
+implementation of the Core Contract above:
 
 - `home-care.store` — `Store` protocol + `MemStore`: clients, care plans,
   visits, lift events. A visit/lift event can only be recorded against a
@@ -60,9 +60,17 @@ of the Core Contract above (pure cljc, no external deps):
   **always** escalate to `:human-approval` regardless of safety-class or
   confidence — a lift/transfer robot never operates unsupervised;
   `:high`/`:safety-critical` and low-confidence proposals also escalate.
+  A lift for a client whose care plan says `:mobility :full-assist` is
+  **held** unless it names a mechanical aid (`:robot` / `:lift`).
+- `home-care.facts` — the rule above, quoted verbatim from 厚生労働省
+  [「職場における腰痛予防対策指針」](https://www.mhlw.go.jp/stf/houdou/2r98520000034et4-att/2r98520000034pjn_1.pdf)
+  別紙 Ⅳ 3 (3) イ (「全介助の必要な対象者には、リフト等を積極的に使用することとし、
+  原則として人力による人の抱上げは行わせないこと」), whose scope names
+  訪問介護・看護. The guideline's sliding-board / standing-machine advice is
+  surfaced as `:recommended-aid`, not enforced — it says 検討, not 禁止.
 
 ```bash
-kbb -M:test   # 7 tests, 13 assertions, green
+kbb -M:test   # 15 tests, 36 assertions, green
 ```
 
 This is what backs this repo's `:maturity :implemented` entry in

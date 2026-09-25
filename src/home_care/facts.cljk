@@ -1,0 +1,46 @@
+(ns home-care.facts
+  "Disclosed facts the Home Care Governor enforces — each one quoted verbatim
+  from a fetched primary source, never recalled.
+
+  Source: 厚生労働省「職場における腰痛予防対策指針」(2013-06-18 改訂, 別添).
+  The guideline's 別紙 Ⅳ covers 訪問介護・看護 by name, so it applies to an
+  independent home-based personal care worker (ISCO-08 5322), not only to
+  facilities.
+
+  Provenance (2026-09-25): GET of `guideline-url` returned 200,
+  application/pdf, 1,034,303 bytes, sha256
+  806baf072af5cc742ddc203e9ea31cf327961d6f6264e726cc99f11c0e45d6e5; a sibling
+  attachment name (…mu2_2.pdf) returned 404, so the 200 is evidence about
+  THIS document. Each `:source-quote` was matched as an exact substring of
+  `pdftotext -layout` output with whitespace removed.
+
+  What is NOT here: the guideline tells the employer to *consider* a sliding
+  board (sitting-capable client) or standing machine (standing-capable
+  client) — that is advice, so the governor only recommends it. The one
+  prohibition (原則として…行わせないこと) is the only hard rule derived.")
+
+(def guideline-url
+  "https://www.mhlw.go.jp/stf/houdou/2r98520000034et4-att/2r98520000034pjn_1.pdf")
+
+(def scope
+  {:source-url guideline-url
+   :section "別紙 Ⅳ 福祉・医療分野等における介護・看護作業"
+   :source-quote "高齢者介護施設・障害児者施設・保育所等の社会福祉施設、医療機関、訪問介護・看護、特別支援学校での教育等で介護・看護作業等を行う場合には"})
+
+(def no-manual-lift-of-full-assist
+  "The hard rule: a client who needs full assistance is not lifted by human
+  strength; a lift is used."
+  {:source-url guideline-url
+   :section "別紙 Ⅳ 3 (3) イ 抱上げ"
+   :source-quote "移乗介助、入浴介助及び排泄介助における対象者の抱上げは、労働者の腰部に著しく負担がかかることから、全介助の必要な対象者には、リフト等を積極的に使用することとし、原則として人力による人の抱上げは行わせないこと。"
+   :mobility :full-assist
+   :forbidden-method :manual})
+
+(def aid-by-mobility
+  "Advisory: which aid the guideline names for a client's retained function."
+  {:source-url guideline-url
+   :section "別紙 Ⅳ 3 (3) イ 抱上げ"
+   :source-quote "対象者が座位保持できる場合にはスライディングボード等の使用、立位保持できる場合にはスタンディングマシーン等の使用を含めて検討し、対象者に適した方法で移乗介助を行わせること。"
+   :aid {:full-assist :lift
+         :sitting     :sliding-board
+         :standing    :standing-machine}})

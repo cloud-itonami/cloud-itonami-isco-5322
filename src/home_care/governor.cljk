@@ -19,11 +19,18 @@
     2. No-actuation         — the proposal must not directly mutate a visit
        or lift-event record outside the record-visit!/record-lift-event!
        path (effect must be :propose, never a raw store write).
+    3. No manual lift of a full-assist client — a :lift for a client whose
+       care plan says `:mobility :full-assist` must name a mechanical aid
+       (`:method` in `mechanical-lift-methods`); human-strength or unstated
+       method is held. Quoted from MHLW's 腰痛予防対策指針, see
+       `home-care.facts/no-manual-lift-of-full-assist`.
   SOFT:
-    3. Lifting/transfer assist always escalates to human sign-off (no
-       autonomous lift/transfer, robot or otherwise).
-    4. Confidence floor → escalate."
-  (:require [home-care.store :as store]))
+    4. Lifting/transfer assist always escalates to human sign-off (no
+       autonomous lift/transfer, robot or otherwise), carrying the aid the
+       guideline names for the client's mobility (`:recommended-aid`).
+    5. Confidence floor → escalate."
+  (:require [home-care.facts :as facts]
+            [home-care.store :as store]))
 
 (def confidence-floor 0.6)
 (def safety-classes [:none :low :medium :high :safety-critical])
@@ -31,6 +38,15 @@
 (defn- safety-rank [safety-class]
   (let [idx (.indexOf safety-classes safety-class)]
     (if (neg? idx) 0 idx)))
+
+(def mechanical-lift-methods
+  "The guideline's リフト等: the lifting-assist robot or a lift device."
+  #{:robot :lift})
+
+(defn- manual-lift-of-full-assist? [care-plan {:keys [action method]}]
+  (and (= :lift action)
+       (= (:mobility facts/no-manual-lift-of-full-assist) (:mobility care-plan))
+       (not (contains? mechanical-lift-methods method))))
 
 (defn- hard-violations [{:keys [care-plan-fn]} proposal]
   (let [{:keys [client-id effect]} proposal
@@ -40,7 +56,16 @@
       (conj {:rule :no-care-plan :detail (str "未登録 care-plan " client-id)})
 
       (not= :propose effect)
-      (conj {:rule :no-actuation :detail "effect は :propose のみ許可（直接書込禁止）"}))))
+      (conj {:rule :no-actuation :detail "effect は :propose のみ許可（直接書込禁止）"})
+
+      (manual-lift-of-full-assist? care-plan proposal)
+      (conj {:rule :manual-lift-of-full-assist
+             :detail (str "全介助の対象者を人力で抱上げない（method "
+                          (pr-str (:method proposal)) "）")
+             :source-url (:source-url facts/no-manual-lift-of-full-assist)}))))
+
+(defn- recommended-aid [{:keys [care-plan-fn]} {:keys [client-id]}]
+  (get (:aid facts/aid-by-mobility) (:mobility (care-plan-fn client-id))))
 
 (defn assess
   "Assess a proposal against `env` (a map with `:care-plan-fn` lookup,
@@ -56,8 +81,10 @@
       {:decision :hold :violations violations :confidence confidence}
 
       lifting?
-      {:decision :human-approval :violations [] :confidence confidence
-       :reason :lifting-transfer-assist}
+      (cond-> {:decision :human-approval :violations [] :confidence confidence
+               :reason :lifting-transfer-assist}
+        (recommended-aid env proposal)
+        (assoc :recommended-aid (recommended-aid env proposal)))
 
       (>= (safety-rank safety-class) (safety-rank :high))
       {:decision :human-approval :violations [] :confidence confidence}
